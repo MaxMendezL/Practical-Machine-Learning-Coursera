@@ -1,0 +1,91 @@
+---
+title: "Coursera Machine Learning Project"
+author: "Max Mendez L"
+date: "17/07/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background and Objective
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+#Apply your machine learning algorithm to the 20 test cases available in the test data above and submit your predictions in appropriate format to the Course Project Prediction Quiz for automated grading.
+
+```{r}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(corrplot)
+
+#Load Data
+setwd("/Volumes/Data/Documents HD (Samsung)/Documents/PhD/R training/Codes")
+training<- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+test<- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(training, destfile = "/Volumes/Data/Documents HD (Samsung)/Documents/PhD/R training/Codes/training_CMLProject.csv", method="libcurl")
+download.file(test, destfile = "//Volumes/Data/Documents HD (Samsung)/Documents/PhD/R training/Codes/test_CMLProject.csv", method="libcurl")
+
+training<- read.csv("training_CMLProject.csv")
+test<- read.csv("test_CMLProject.csv")
+```
+
+```{r}
+#Data Manipulation and Exploratory Analysis. Making Partition.
+intrain <- createDataPartition(training$classe, p=0.70, list=F )# create data partition
+training2 <- training[intrain, ]
+testing2  <- test[-intrain, ]
+
+#Here we remove the columns that don't provide any information to our model
+NZV <- nearZeroVar(training)
+training2 <- training[, -NZV ]
+test  <- test[, -NZV]
+AllNA    <- sapply(training2, function(x) mean(is.na(x))) > 0.95
+training2 <- training2[, AllNA==FALSE]
+test  <- test[, AllNA==FALSE]
+training2<- training2[-c(1:6)]
+
+#PCA calculation
+training3<- preProcess(training2, method = c("BoxCox", "center", "scale","pca"), thresh = 0.95) 
+training3 #PCA needed 25 components to capture 95% fo the variance
+
+#Making a Correlation Matrix and Plot
+corMatrix <- cor(training2[,-53])
+corrplot(corMatrix, method="color")
+
+# Model Training based on Decision Trees
+set.seed(123)
+Fit <- trainControl(method="rpart", number=3, verboseIter=FALSE, allowParallel = T)
+FitRF <- train(classe ~ ., data=training2, method="rpart")
+FitRF$finalModel
+rpart.plot(FitRF$finalModel, roundint=FALSE)
+#Prediction in the training subset
+Pred <- predict(FitRF, newdata=training2)
+confusionMatrix(Pred, training2$classe)
+
+```
+The Decision Tree gives only 49% accuracy, therefore we will see Random Forests' accuracy
+```{r}
+# Model Training based on Random Forests
+Fit2 <- trainControl(method="cv", number=3, verboseIter=FALSE, allowParallel = T)
+Fit2RF <- train(classe ~ ., data=training2, method="rf", trControl=Fit2)
+Fit2RF$finalModel
+Pred2 <- predict(Fit2RF, newdata=training2)
+confusionMatrix(Pred2, training2$classe)
+```
+
+Model Selection and trainig in the Test Data
+```{r}
+Testfit <- predict(Fit2RF, test)
+Testfit
+
+```
+Conclusion
+Random Forests outperfom Desicion Trees with 99% accuracy
+
+
+
+
+
